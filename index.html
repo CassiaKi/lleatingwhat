@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>玲玲今天吃什么</title>
+    <style>
+        :root {
+            --bg: #fdfdfb;
+            --primary: #e67e22; /* 温暖的橙色 */
+            --accent: #d35400;
+            --text: #2c3e50;
+            --disabled: #bdc3c7;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, "Noto Sans SC", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            touch-action: none; /* 防止刮刮乐时页面滚动 */
+        }
+
+        .header { text-align: center; margin-bottom: 40px; transition: opacity 0.5s; }
+        .header.fade { opacity: 0.3; }
+        .header h1 { font-size: 1.6rem; margin: 0; color: var(--text); letter-spacing: 1px; }
+        .header p { font-size: 0.9rem; color: #95a5a6; margin-top: 10px; }
+
+        .card-container {
+            position: relative;
+            width: 320px;
+            height: 180px;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #f1ece1;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* 选中后的卡片样式 */
+        .card-container.selected {
+            transform: scale(1.05);
+            box-shadow: 0 20px 50px rgba(230, 126, 34, 0.15);
+            border-color: var(--soft-gold);
+        }
+
+        .food-icon { font-size: 3.5rem; margin-bottom: 5px; }
+        .food-name { font-size: 1.5rem; font-weight: bold; color: var(--accent); }
+
+        canvas#scratchCanvas {
+            position: absolute;
+            top: 0; left: 0;
+            cursor: pointer;
+            transition: opacity 0.6s ease;
+            z-index: 10;
+        }
+
+        .btn-group { margin-top: 45px; display: flex; gap: 15px; }
+        
+        .btn {
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.95rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-main { 
+            background: var(--primary); 
+            color: white; 
+            box-shadow: 0 4px 15px rgba(230, 126, 34, 0.2); 
+        }
+        .btn-sub { background: #f1f2f6; color: #747d8c; }
+        
+        .btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+        .btn:active:not(:disabled) { transform: scale(0.96); }
+
+        /* 禁用状态 */
+        .btn:disabled {
+            background-color: #ecf0f1;
+            color: #bdc3c7;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* 礼花动画的特定按钮样式 */
+        .btn-main.celebrate {
+            animation: pulse 0.5s ease-out;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(230, 126, 34, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(230, 126, 34, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(230, 126, 34, 0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header" id="header">
+        <h1>🍱 玲玲今天吃什么</h1>
+        <p>不必纠结，总有一款能吃</p>
+    </div>
+
+    <div class="card-container" id="container">
+        <div class="food-icon" id="foodIcon">🍲</div>
+        <div class="food-name" id="foodName">美食加载中...</div>
+        <canvas id="scratchCanvas"></canvas>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn btn-sub" id="btnSub" onclick="resetCard()">不喜欢！</button>
+        <button class="btn btn-main" id="btnMain" onclick="decideFood()">就吃这个！</button>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/confetti.browser.min.js"></script>
+
+<script>
+    // 精选50种极具烟火气的美食
+    const foodList = [
+        { name: "麻辣烫", icon: "🍢" }, { name: "黄焖鸡米饭", icon: "🥘" },
+        { name: "酸辣粉", icon: "🍜" }, { name: "烤冷面", icon: "🍳" },
+        { name: "麻辣香锅", icon: "🥘" }, { name: "螺蛳粉", icon: "🐌" },
+        { name: "路边摊炸串", icon: "🍡" }, { name: "肉夹馍", icon: "🥙" },
+        { name: "砂锅土豆粉", icon: "🍲" }, { name: "凉皮凉面", icon: "🍝" },
+        { name: "手抓饼", icon: "🌯" }, { name: "脆皮五花肉", icon: "🐷" },
+        { name: "过桥米线", icon: "🍜" }, { name: "兰州拉面", icon: "🍜" },
+        { name: "热干面", icon: "🥢" }, { name: "鸡蛋灌饼", icon: "🥞" },
+        { name: "鸭血粉丝汤", icon: "🥣" }, { name: "东北大拉皮", icon: "🥗" },
+        { name: "锅包肉", icon: "🍖" }, { name: "现包大水饺", icon: "🥟" },
+        { name: "生煎包", icon: "🥨" }, { name: "铁板鱿鱼", icon: "🦑" },
+        { name: "胡辣汤", icon: "☕" }, { name: "小笼包", icon: "🥯" },
+        { name: "红烧牛肉面", icon: "🍜" }, { name: "盖浇饭", icon: "🍱" },
+        { name: "臭豆腐", icon: "⬛" }, { name: "纸包鱼", icon: "🐟" },
+        { name: "地锅鸡", icon: "🍳" }, { name: "炸鸡柳", icon: "🍟" },
+        { name: "卤肉饭", icon: "🍚" }, { name: "酸菜鱼", icon: "🐟" },
+        { name: "回锅肉", icon: "🥓" }, { name: "干锅鸭头", icon: "🦆" },
+        { name: "炭火烤鱼", icon: "🔥" }, { name: "排档大锅炒粉", icon: "🍝" },
+        { name: "冒菜", icon: "🍲" }, { name: "章鱼小丸子", icon: "🐙" },
+        { name: "蜜雪冰城", icon: "🍦" }, { name: "炸串夹馍", icon: "🥖" },
+        { name: "砂锅粥", icon: "🥣" }, { name: "担担面", icon: "🥢" },
+        { name: "烤地瓜", icon: "🍠" }, { name: "关东煮", icon: "🍢" },
+        { name: "炸酱面", icon: "🍜" }, { name: "香辣虾", icon: "🦐" },
+        { name: "重庆小面", icon: "🍜" }, { name: "铁板烧", icon: "🥘" },
+        { name: "烤肉饭", icon: "🍚" }, { name: "煎饼果子", icon: "🌯" }
+    ];
+
+    const canvas = document.getElementById('scratchCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('container');
+    const btnMain = document.getElementById('btnMain');
+    const btnSub = document.getElementById('btnSub');
+    const header = document.getElementById('header');
+
+    let isDrawing = false;
+    let isDecided = false; // 记录是否已经做出了决定
+
+    function init() {
+        // 重置状态
+        isDecided = false;
+        btnMain.disabled = false;
+        btnSub.disabled = false;
+        btnMain.innerText = "就吃这个！";
+        btnMain.classList.remove('celebrate');
+        container.classList.remove('selected');
+        header.classList.remove('fade');
+
+        canvas.width = container.offsetWidth;
+        canvas.height = container.offsetHeight;
+
+        // 随机选择食物
+        const randomFood = foodList[Math.floor(Math.random() * foodList.length)];
+        document.getElementById('foodIcon').innerText = randomFood.icon;
+        document.getElementById('foodName').innerText = randomFood.name;
+
+        // 绘制涂层：优雅的莫兰迪灰调
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#dfe6e9'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 装饰纹理
+        ctx.fillStyle = "#b2bec3";
+        for(let i=0; i<80; i++) {
+            ctx.beginPath();
+            ctx.arc(Math.random()*canvas.width, Math.random()*canvas.height, 1, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        ctx.fillStyle = "#636e72";
+        ctx.font = "600 16px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("好好吃饭 ✨", canvas.width/2, canvas.height/2 + 6);
+        
+        canvas.style.opacity = '1';
+        canvas.style.pointerEvents = 'auto'; // 允许刮擦
+    }
+
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function scratch(e) {
+        if (!isDrawing || isDecided) return; // 如果做出决定，停止刮擦
+        const pos = getPos(e);
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 22, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 检测刮开面积，超过45%自动展示
+        const data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+        let trans = 0;
+        for(let i=3; i<data.length; i+=100) { if(data[i]===0) trans++; }
+        if(trans > (data.length/100)*0.45) revealCard();
+    }
+
+    function revealCard() {
+        canvas.style.opacity = '0';
+        canvas.style.pointerEvents = 'none'; // 停止刮擦交互
+    }
+
+    // 新增：决定食物的逻辑
+    function decideFood() {
+        if (isDecided) return;
+        
+        revealCard(); // 确保卡片完全露出
+
+        isDecided = true;
+        
+        // 1. UI 反馈
+        btnMain.disabled = true; // 禁用自身，防止重复点击
+        btnSub.disabled = true;  // 禁用“再抽一盒”
+        btnMain.innerText = "祝你好胃口!";
+        btnMain.classList.add('celebrate'); // 添加脉冲动画
+        container.classList.add('selected'); // 卡片放大凸显
+        header.classList.add('fade');       // 标题变淡，聚焦卡片
+
+        // 2. 弹出礼花 (confetti)
+        // 这是一个高性能的喷射效果
+        confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 }, // 从按钮上方一点喷出
+            colors: ['#e67e22', '#ffda79', '#fad390', '#f6b93b'], // 匹配食物主题的金色/橙色色调
+            disableForReducedMotion: true // 照顾不喜欢强烈动画的用户
+        });
+
+        // 可选：加一个额外的、侧面喷射的效果，更有层次感
+        setTimeout(() => {
+            confetti({
+                particleCount: 50,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0 },
+                colors: ['#e67e22', '#fff']
+            });
+            confetti({
+                particleCount: 50,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1 },
+                colors: ['#e67e22', '#fff']
+            });
+        }, 150);
+    }
+
+    // 修改：resetCard 需要在未做出决定或决定后重置
+    function resetCard() {
+        if (isDecided) return; // 做出决定后，不能通过这个按钮重置（它已经被禁用了，但这做个保险）
+        canvas.style.opacity = '0';
+        setTimeout(init, 300);
+    }
+
+    // 监听：如果玲玲刮开了卡片，允许她随时重置或决定
+    // 这里的 resetCard 保持原样，decideFood 包含禁用逻辑
+
+    canvas.addEventListener('mousedown', () => isDrawing = true);
+    canvas.addEventListener('touchstart', (e) => { isDrawing = true; e.preventDefault(); });
+    window.addEventListener('mouseup', () => isDrawing = false);
+    window.addEventListener('touchend', () => isDrawing = false);
+    canvas.addEventListener('mousemove', scratch);
+    canvas.addEventListener('touchmove', scratch);
+
+    init();
+</script>
+</body>
+</html>
